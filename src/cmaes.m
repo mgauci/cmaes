@@ -213,7 +213,7 @@ classdef cmaes < handle
         
         function [] = update_h_sigma(obj)
             if ((norm(obj.p_sigma) / sqrt(1 - (obj.const_40_1 ...
-                    ^ (2 * (obj.g + 1))))) < obj.const_h_sigma_threshold)s
+                    ^ (2 * (obj.g + 1))))) < obj.const_h_sigma_threshold)
                 obj.h_sigma = 1;
             else
                 obj.h_sigma = 0;
