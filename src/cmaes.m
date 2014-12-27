@@ -3,21 +3,18 @@ classdef cmaes < handle
     %   Detailed explanation goes here
     
     properties
-        n;         % Problem dimension.
-        
-        lambda;    % Population size before selection.
-        mu;        % Population size after selection.
-        
-        w;         % Recombination weights.
-        mu_eff;    % Effective TODO. 
-        
-        c_sigma;   % Cumulation learning rate for step size control.
-        d_sigma;   % Damping parameter for step size update.
-        c_c;       % Cumulation learning rate for rank-one update of
-                   % covariance matrix.
-        c_1;       % Learning rate for rank-one update of covariance
-                   % matrix.
-        c_mu;      % Learning rate for rank-mu update of covariance matrix.
+        n;          % Problem dimension.
+        lambda;     % Population size before selection.
+        mu;         % Population size after selection.
+        w;          % Recombination weights.
+        c_sigma;    % Cumulation learning rate for step size update.
+        d_sigma;    % Damping parameter for step size update.
+        c_c;        % Cumulation learning rate for rank-one update of
+                    % covariance matrix.
+        c_1;        % Learning rate for rank-one update of covariance
+                    % matrix.
+        c_mu;       % Learning rate for rank-mu update of covariance 
+                    % matrix.
         
         m;         % Weighted mean.
         sigma;     % Overall step size.
@@ -35,6 +32,7 @@ classdef cmaes < handle
         
         g;         % Generation.
         
+        mu_eff;    % Variance effective selection mass. 
         EN0I;      % Expectation of randomly-generated vector according to
                    % Normal(0, I) distribution.
         
