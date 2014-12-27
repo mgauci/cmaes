@@ -57,9 +57,17 @@ classdef cmaes < handle
     
     methods
         function obj = cmaes(m, sigma, opts)
-            assert(isrow(m));
-            assert(isscalar(sigma));
-            assert(sigma > 0);
+            if (~isrow(m))
+                error('m must be a row vector.');
+            end
+            
+            if (~isscalar(sigma))
+                error('sigma must be a scalar.');
+            end
+
+            if (~(sigma > 0))
+                error('sigma must be greater than 0.');
+            end
             
             obj.m = m;
             obj.sigma = sigma;
@@ -205,7 +213,7 @@ classdef cmaes < handle
         
         function [] = update_h_sigma(obj)
             if ((norm(obj.p_sigma) / sqrt(1 - (obj.const_40_1 ...
-                    ^ (2 * (obj.g + 1))))) < obj.const_h_sigma_threshold)
+                    ^ (2 * (obj.g + 1))))) < obj.const_h_sigma_threshold)s
                 obj.h_sigma = 1;
             else
                 obj.h_sigma = 0;
