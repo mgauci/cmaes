@@ -69,30 +69,76 @@ classdef cmaes < handle
     
     methods
         function obj = cmaes(m, sigma, opts)
-            if ~isrow(m)
-                error('m must be a row vector.');
-            end
-            if ~isscalar(sigma)
-                error('sigma must be a scalar.');
-            end
-            if ~(sigma > 0)
-                error('sigma must be greater than 0.');
-            end
-           
+            obj.validate_m_and_sigma(); 
+            
+            obj.n = length(m);
             obj.m = m;
             obj.sigma = sigma;
+            
+            obj.validate_opts(opts);
             
             obj.init_params(opts);
             obj.init_consts();
             obj.init_vars();
             
             if isfield(opts, 'f_evals_max')
-                if ~isscalar(opts.f_evals_max')
-                    error('f_evals_max must be a scalar.');
-                end
                 obj.f_evals_max = opts.f_evals_max;
             end
         end
+        
+        function [] = validate_m_and_sigma(m, sigma)
+            if (~isvector(m) || ~isnumeric(m) || ~isreal(m))
+                error('m must be a vector of real numbers.');
+            end
+            if (~isscalar(sigma) || ~isnumeric(sigma) || ...
+                    ~isreal(sigma) || ~(sigma > 0))
+                error('sigma must be a positive real scalar.');
+            end
+        end
+        
+        function [] = validate_opts(obj, opts)
+            if isfield(opts, 'lambda')
+                if (~isscalar(opts.lambda) || isnumeric(opts.lamba) || ...
+                        ~isreal(opts.lambda) || ...
+                        ~(opts.lambda == floor(opts.lambda)) || ...
+                        ~(opts.lambda > 1))
+                    error('lambda must be an integer greater than 1.');
+                end
+                local_lambda = opts.lambda;
+            else
+                local_lambda = 4 + floor(3 * log(obj.n));
+            end
+            
+            if isfield(opts, 'mu')
+                if ~isscalar(opts.mu)
+                    error('mu must be a scalar.');
+                end
+                if ~isreal(opts.mu)
+                    error('mu must be a real number.');
+                end
+                if ~(opts.mu < opts.lambda)
+                    error('mu must be smaller than lambda.');
+                end
+                local_mu = opts.mu;
+            else
+                local_mu = floor(local_lambda / 2);
+            end
+            
+            if isfield(opts, 'w')
+                if ~(isvector(opts.w))
+                    error('w must be a vector.');
+                end
+                if ~(length(opts.w) == local_mu)
+                    error('Vector w must have size mu.');
+                end
+            end
+            
+            if isfield(opts.f_evals_max)
+                if ~isscalar(opts.f_evals_max')
+                    error('f_evals_max must be a scalar.');
+                end
+            end
+        end % Function validate_opts().
         
         function [] = init_vars(obj)
             obj.g = 0;
@@ -103,16 +149,8 @@ classdef cmaes < handle
 
         
         function [] = init_params(obj, opts)
-            obj.n = length(obj.m);
-            
             % Eq. 44.
             if isfield(opts, 'lambda')
-                if ~isscalar(opts.lambda)
-                    error('lambda must be a scalar.');
-                end
-                if ~(opts.lambda > 1)
-                    error('lambda must be greater than 1.');
-                end
                 obj.lambda = opts.lambda;
             else
                 obj.lambda = 4 + floor(3 * log(obj.n));
