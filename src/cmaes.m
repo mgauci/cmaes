@@ -1,58 +1,70 @@
 classdef cmaes < handle
-    %CMAES Covariance Matrix Adaptation Evolution Strategy Optimizer
-    %   Detailed explanation goes here
+    %CMAES Covariance Matrix Adaptation Evolution Strategy
+    %   TODO: Detailed documentation.
     
-    properties
+    properties (GetAccess = private)
+        %------------------------------------------------------------------
+        % Algorithm paramters.
+        %------------------------------------------------------------------
         n;          % Problem dimension.
         lambda;     % Population size before selection.
         mu;         % Population size after selection.
         w;          % Recombination weights.
         c_sigma;    % Cumulation learning rate for step size update.
         d_sigma;    % Damping parameter for step size update.
-        c_c;        % Cumulation learning rate for rank-one update of
-                    % covariance matrix.
+        c_c;        % Cumulation learning rate for for rank one update
+                    % of covariance matrix.
         c_1;        % Learning rate for rank-one update of covariance
                     % matrix.
         c_mu;       % Learning rate for rank-mu update of covariance 
                     % matrix.
+                    
+        %------------------------------------------------------------------
+        % Termination parameters.
+        %------------------------------------------------------------------
+        f_evals_max;    % Maximum number of objective function evaluations.      
         
-        m;         % Weighted mean.
-        sigma;     % Overall step size.
+        %------------------------------------------------------------------
+        % Algorithm variables.                                                      
+        %------------------------------------------------------------------
+        g;          % Generation.
+        Y;          % Candidate solutions (realizations from a multivariate
+                    % normal distribution with zero mean and covariance
+                    % matrix C).
+        Y_sel;      % Selected candidate solutions. 
+        y_w;        % Step of distribution mean disregarding step size.
+        m;          % Weighted mean of selected points.
+        p_sigma;    % Conjugate evolution path.
+        sigma;      % Overall step size (standard deviation).
+        p_c;        % Evolution path.
+        C;          % Covariance matrix.
+        B;          % Eigenvector matrix of C.
+        D;          % Diagonal matrix of square roots of eigenvalues of C.
         
-        p_sigma;
-        p_c;
+        h_sigma;          % Todo: potentially change to local variables.
+        delta_h_sigma;    % """
         
-        C;         % Covariance matrix.
-        B;         % Eigenvector matrix of C.
-        D;         % Diagonal matrix of square roots of eigenvalues of C.
+        %------------------------------------------------------------------
+        % Termination variables.                                                    
+        %------------------------------------------------------------------
+        f_evals = 0;    % Number of function evaluations.
         
-        Y;         % Offspring population (before mean-shifting).
-        Y_sel;
-        y_w;       % Weighted average of all y's.
-        
-        g;         % Generation.
-        
-        mu_eff;    % Variance effective selection mass. 
-        EN0I;      % Expectation of randomly-generated vector according to
-                   % Normal(0, I) distribution.
-        
-        const_40_1;
-        const_40_2;
-        const_41_1;
-        const_42_1;
-        const_42_2;
-        const_43_1;
-        
-        h_sigma;
-        delta_h_sigma;
-        
-        const_delta_h_sigma;
-        const_h_sigma_threshold;
-        
-        f_evals = 0; % Number of function evaluations.
-        
-        f_evals_max;
-        
+        %------------------------------------------------------------------
+        % Pre-computed constants.                                                      
+        %------------------------------------------------------------------
+        mu_eff;        % Variance effective selection mass. 
+        EN0I;          % Expectation of Euclidean norm of N(0, I) 
+                       % distributed random vector.
+                       
+        const_40_1;    
+        const_40_2;     
+        const_41_1;    
+        const_42_1;    
+        const_42_2;    
+        const_43_1;    
+
+        delta_h_sigma_value;
+        h_sigma_threshold;
     end
     
     methods
@@ -128,26 +140,18 @@ classdef cmaes < handle
         end
         
         function [] = init_consts(obj)
-            % --- Pre-computed constants that appear in equations. ---
-            
             obj.const_40_1 = 1 - obj.c_sigma;
             obj.const_40_2 = sqrt(obj.c_sigma * (2 - obj.c_sigma) * ...
                 obj.mu_eff);
-            
             obj.const_41_1 = obj.c_sigma / obj.d_sigma;
-            
             obj.const_42_1 = 1 - obj.c_c;
             obj.const_42_2 = sqrt(obj.c_c * (2 - obj.c_c) * obj.mu_eff);
-            
             obj.const_43_1 = 1 - obj.c_1 - obj.c_mu;
             
-            obj.EN0I = sqrt(obj.n) * (1 - (1 / (4 * obj.n)) + ...
-                (1 / (21 * (obj.n ^2 ))));
-            
-            obj.const_h_sigma_threshold = (1.4 + (2 / (obj.n + 1))) * ...
-                obj.EN0I;
-            
-            obj.const_delta_h_sigma = obj.c_c * (2 - obj.c_c);
+            obj.EN0I = sqrt(obj.n) * (1 - (1 / (4 * obj.n)) + (1 / ...
+                (21 * (obj.n ^2 ))));
+            obj.h_sigma_threshold = (1.4 + (2 / (obj.n + 1))) * obj.EN0I;
+            obj.delta_h_sigma_value = obj.c_c * (2 - obj.c_c);
         end
         
         function solutions = ask(obj)
@@ -213,7 +217,7 @@ classdef cmaes < handle
         
         function [] = update_h_sigma(obj)
             if ((norm(obj.p_sigma) / sqrt(1 - (obj.const_40_1 ...
-                    ^ (2 * (obj.g + 1))))) < obj.const_h_sigma_threshold)
+                    ^ (2 * (obj.g + 1))))) < obj.h_sigma_threshold)
                 obj.h_sigma = 1;
             else
                 obj.h_sigma = 0;
@@ -222,7 +226,7 @@ classdef cmaes < handle
         
         function [] = update_delta_h_sigma(obj)
             obj.delta_h_sigma = (1 - obj.h_sigma) * ...
-                obj.const_delta_h_sigma;
+                obj.delta_h_sigma_value;
         end
         
         function m = get_m(obj)
