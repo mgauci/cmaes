@@ -90,6 +90,7 @@ classdef cmaes < handle
                 if ~isscalar(opts.f_evals_max')
                     error('f_evals_max must be a scalar.');
                 end
+                if ~(opts.f_evals_max > 1)
                 obj.f_evals_max = opts.f_evals_max;
             end
         end
