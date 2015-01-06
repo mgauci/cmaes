@@ -2,7 +2,10 @@ clear
 
 n = 100;
 
+
 opts.f_evals_max = (10 ^ 4) * n;
+opts.lambda = 1000;
+
 
 opt = cmaes(-10 + (20 * rand(1, n)), 0.3 * 20, opts);
 

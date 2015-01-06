@@ -3,9 +3,9 @@ classdef cmaes < handle
     %   TODO: Detailed documentation.
     
     properties
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         % Algorithm paramters.
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         n;          % Problem dimension.
         lambda;     % Population size before selection.
         mu;         % Population size after selection.
@@ -19,19 +19,19 @@ classdef cmaes < handle
         c_mu;       % Learning rate for rank-mu update of covariance 
                     % matrix.
                     
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         % Termination parameters.
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         f_evals_max;    % Maximum number of objective function evaluations.      
         
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         % Algorithm variables.                                                      
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         g;          % Generation.
         Y;          % Candidate solutions (realizations from a multivariate
                     % normal distribution with zero mean and covariance
                     % matrix C).
-        Y_sel;      % Selected candidate solutions. 
+        Y_sel;      % Selected candidate solutions ordered by fitness. 
         y_w;        % Step of distribution mean disregarding step size.
         m;          % Weighted mean of selected points.
         p_sigma;    % Conjugate evolution path.
@@ -44,24 +44,24 @@ classdef cmaes < handle
         h_sigma;          % Todo: potentially change to local variables.
         delta_h_sigma;    % """
         
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         % Termination variables.                                                    
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         f_evals = 0;    % Number of function evaluations.
         
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         % Pre-computed constants.                                                      
-        %------------------------------------------------------------------
+        %-----------------------------------------------------------------------
         mu_eff;        % Variance effective selection mass. 
         EN0I;          % Expectation of Euclidean norm of N(0, I) 
                        % distributed random vector.
                        
-        const_40_1;    
-        const_40_2;     
-        const_41_1;    
-        const_42_1;    
-        const_42_2;    
-        const_43_1;    
+        const_40_1;    %
+        const_40_2;    % Pre-computed constants that appear in equations.
+        const_41_1;    % First numbers correspond to equation numbers in
+        const_42_1;    % [1]. Second numbers enumerate different constants
+        const_42_2;    % within a single equation.
+        const_43_1;    %
 
         delta_h_sigma_value;
         h_sigma_threshold;
@@ -69,7 +69,7 @@ classdef cmaes < handle
     
     methods
         function obj = cmaes(m, sigma, opts)
-            obj.validate_m_and_sigma(); 
+            obj.validate_m_and_sigma(m, sigma); 
             
             obj.n = length(m);
             obj.m = m;
@@ -86,23 +86,28 @@ classdef cmaes < handle
             end
         end
         
-        function [] = validate_m_and_sigma(m, sigma)
-            if (~isvector(m) || ~isnumeric(m) || ~isreal(m))
+        function validate_m_and_sigma(~, m, sigma)
+            if ~(isvector(m) && isnumeric(m) && isreal(m))
                 error('m must be a vector of real numbers.');
             end
-            if (~isscalar(sigma) || ~isnumeric(sigma) || ...
-                    ~isreal(sigma) || ~(sigma > 0))
+            if ~(isscalar(sigma) && isnumeric(sigma) && isreal(sigma) ...
+                    && (sigma > 0))
                 error('sigma must be a positive real scalar.');
             end
         end
         
-        function [] = validate_opts(obj, opts)
+        function validate_opts(obj, opts)
             if isfield(opts, 'lambda')
-                if (~isscalar(opts.lambda) || isnumeric(opts.lamba) || ...
-                        ~isreal(opts.lambda) || ...
-                        ~(opts.lambda == floor(opts.lambda)) || ...
-                        ~(opts.lambda > 1))
-                    error('lambda must be an integer greater than 1.');
+                if ((~isscalar(opts.lambda)) || ...
+                        (~isnumeric(opts.lambda)) || ...
+                        (~isreal(opts.lambda)))
+                    error('lambda must be an integer.');
+                end
+                if (~(opts.lambda >= 2))
+                    error('lambda must be an greater than or equal to 2.');
+                end
+                if (~(opts.lambda == floor(opts.lambda)))
+                    warning('lambda is not an integer. Taking floor value.');
                 end
                 local_lambda = opts.lambda;
             else
@@ -110,31 +115,68 @@ classdef cmaes < handle
             end
             
             if isfield(opts, 'mu')
-                if ~isscalar(opts.mu)
-                    error('mu must be a scalar.');
+                if ((~isscalar(opts.mu)) || (~isnumeric(opts.mu)) || ...
+                        (~isreal(opts.mu)))
+                    error('mu must be an integer.');
                 end
-                if ~isreal(opts.mu)
-                    error('mu must be a real number.');
+                if (~(opts.mu >= 1))
+                    error('mu must be greater than or equal to 1.');
                 end
-                if ~(opts.mu < opts.lambda)
+                if (~(opts.mu < local_lambda))
                     error('mu must be smaller than lambda.');
+                end
+                if (~(opts.mu == floor(opts.mu)))
+                    warning ('mu is not an integer. Taking floor value.');
                 end
                 local_mu = opts.mu;
             else
                 local_mu = floor(local_lambda / 2);
             end
             
-            if isfield(opts, 'w')
-                if ~(isvector(opts.w))
-                    error('w must be a vector.');
+            if (isfield(opts, 'w'))
+                if ((~(isvector(opts.w))) || (~(isnumeric(opts.w))) || ...
+                        (~isreal(opts.mu)))
+                    error('w must be a vector of real numbers.');
                 end
-                if ~(length(opts.w) == local_mu)
-                    error('Vector w must have size mu.');
+                if (~(length(opts.w) == local_mu))
+                    error('w must have length mu.');
+                end
+                if (~(min(opts.w) > 0))
+                    error('w must contain only numbers greater than or equal to 0.');
+                end
+                if (~(max(opts.w) > 0))
+                    error('w must contain at least one number greater than 0.');
+                end
+                if (~(sum(opts.w) == 1))
+                    warning('sum(w) is not equal to 1. Normalizing.');
                 end
             end
             
-            if isfield(opts.f_evals_max)
-                if ~isscalar(opts.f_evals_max')
+            if isfield(opts, 'c_sigma')
+                if ((~isscalar(opts.c_sigma)) || ...
+                        (~isnumeric(opts.c_sigma)) || ...
+                        (~isreal(opts.c_sigma)))
+                    error('c_sigma must be a scalar real number.');
+                end
+                if ((~(0 <= opts.c_sigma)) || (~(opts.c_sigma <= 1)))
+                    error('c_sigma must be in [0, 1].');
+                end
+            end
+            
+            if isfield(opts, 'd_sigma')
+            end
+            
+            if isfield(opts, 'c_c')
+            end
+            
+            if isfield(opts, 'c_1')
+            end
+            
+            if isfield(opts, 'c_mu')
+            end
+            
+            if isfield(opts, 'f_evals_max')
+                if (~isscalar(opts.f_evals_max'))
                     error('f_evals_max must be a scalar.');
                 end
             end
@@ -208,6 +250,15 @@ classdef cmaes < handle
             obj.Y = (obj.B * obj.D * Z).';
             
             solutions = repmat(obj.m, obj.lambda, 1) + (obj.sigma * obj.Y);
+        end
+        
+        function [] = selection_and_recombination(obj)
+            % Eq. 38.
+            obj.Y_sel = obj.Y(indeces(1 : obj.mu), :);
+            obj.y_w = sum(bsxfun(@times, obj.w.', obj.Y_sel));
+            
+            % Eq. 39.
+            obj.m = obj.m + (obj.sigma * obj.y_w);
         end
         
         function stop = tell(obj, fitnesses)
